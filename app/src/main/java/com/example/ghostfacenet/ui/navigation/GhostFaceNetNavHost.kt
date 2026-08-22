@@ -1,0 +1,62 @@
+package com.example.ghostfacenet.ui.navigation
+
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.ghostfacenet.GhostFaceNetApp
+import com.example.ghostfacenet.data.ThresholdPreferences
+import com.example.ghostfacenet.ui.importer.ImportScreen
+import com.example.ghostfacenet.ui.people.PeopleListScreen
+import com.example.ghostfacenet.ui.recognize.RecognizeScreen
+import com.example.ghostfacenet.ui.settings.SettingsScreen
+
+@Composable
+fun GhostFaceNetNavHost(app: GhostFaceNetApp) {
+    val navController = rememberNavController()
+    val context = LocalContext.current
+    var threshold by remember { mutableStateOf(ThresholdPreferences.get(context)) }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                Screen.items.forEach { screen ->
+                    NavigationBarItem(
+                        selected = currentRoute == screen.route,
+                        onClick = {
+                            navController.navigate(screen.route) { launchSingleTop = true }
+                        },
+                        icon = { Text(screen.label.first().toString()) },
+                        label = { Text(screen.label) }
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Recognize.route,
+            modifier = Modifier.padding(padding)
+        ) {
+            composable(Screen.Recognize.route) { RecognizeScreen(app, threshold) }
+            composable(Screen.People.route) { PeopleListScreen(app) }
+            composable(Screen.Import.route) { ImportScreen(app) }
+            composable(Screen.Settings.route) {
+                SettingsScreen(app) { newValue -> threshold = newValue }
+            }
+        }
+    }
+}

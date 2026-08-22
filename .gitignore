@@ -1,0 +1,30 @@
+# Android / Gradle
+.gradle/
+build/
+captures/
+.cxx/
+*.iml
+local.properties
+
+# IDE (Android Studio / IntelliJ)
+.idea/
+
+# Python (model_prep)
+model_prep/.venv/
+model_prep/checkpoints/
+model_prep/datasets/
+model_prep/output/
+model_prep/__pycache__/
+__pycache__/
+*.pyc
+
+# Dataset de pruebas (pesado, se regenera con prepare_test_set.py)
+test_data/lfw.tgz
+test_data/lfw/
+test_data/enroll/
+test_data/probe_known/
+test_data/probe_unknown/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,6 @@
+tensorflow==2.16.1
+tf-keras==2.16.0
+keras_cv_attention_models==1.4.3
+numpy<2.0
+pillow
+requests
