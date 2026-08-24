@@ -1,5 +1,6 @@
 package com.example.ghostfacenet.ui.importer
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +25,14 @@ class ImportViewModel(private val repository: FaceRepository) : ViewModel() {
         _state.value = ImportUiState.Loading
         viewModelScope.launch {
             val summary = repository.importPhotosFromTree(treeUri)
+            _state.value = ImportUiState.Done(summary)
+        }
+    }
+
+    fun importForPerson(personName: String, bitmaps: List<Bitmap>) {
+        _state.value = ImportUiState.Loading
+        viewModelScope.launch {
+            val summary = repository.importPhotosForPerson(personName, bitmaps)
             _state.value = ImportUiState.Done(summary)
         }
     }

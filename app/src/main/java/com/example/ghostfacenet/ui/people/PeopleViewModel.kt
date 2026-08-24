@@ -22,4 +22,11 @@ class PeopleViewModel(private val repository: FaceRepository) : ViewModel() {
             _people.value = repository.getAllPeople()
         }
     }
+
+    fun deleteAll() {
+        viewModelScope.launch {
+            repository.deleteAllPeople()
+            refresh()
+        }
+    }
 }

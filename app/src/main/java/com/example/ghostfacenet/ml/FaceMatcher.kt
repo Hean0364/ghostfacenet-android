@@ -15,11 +15,18 @@ data class MatchResult(
  */
 object FaceMatcher {
 
-    fun findBestMatch(
+    /**
+     * Devuelve, por cada persona enrolada, su mejor similitud contra el
+     * embedding capturado, ordenadas de mayor a menor (top [topN]). Sirve
+     * tanto para decidir el match principal (la primera del resultado, si
+     * supera el umbral) como para mostrar candidatas cercanas cuando el
+     * resultado es ambiguo o ninguna alcanza el umbral.
+     */
+    fun findTopMatches(
         queryEmbedding: FloatArray,
         candidates: List<EmbeddingWithPerson>,
-        threshold: Float
-    ): MatchResult? {
+        topN: Int = 3
+    ): List<MatchResult> {
         val bestPerPerson = HashMap<Long, MatchResult>()
 
         for (candidate in candidates) {
@@ -36,8 +43,7 @@ object FaceMatcher {
             }
         }
 
-        val best = bestPerPerson.values.maxByOrNull { it.similarity } ?: return null
-        return if (best.similarity >= threshold) best else null
+        return bestPerPerson.values.sortedByDescending { it.similarity }.take(topN)
     }
 
     /** Ambos vectores ya vienen L2-normalizados desde EmbeddingExtractor, asi que el producto punto == similitud coseno. */

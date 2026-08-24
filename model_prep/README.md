@@ -2,7 +2,7 @@
 
 Convierte el checkpoint preentrenado `GhostFaceNetV1-1.3-2 (ArcFace, MS1MV3)` de
 [HamadYA/GhostFaceNets](https://github.com/HamadYA/GhostFaceNets) a un archivo
-`.tflite` listo para usar en la app Android (LiteRT).
+`.tflite` listo para usar en la app Android con TensorFlow Lite `Interpreter`.
 
 ## Setup (Windows, PowerShell)
 
@@ -25,8 +25,18 @@ Esto hace, en orden:
    incluye la arquitectura, así que no hace falta reconstruirla a mano.
 3. Convierte a TFLite con cuantización `float16` y lo guarda en
    `model_prep/output/ghostfacenet.tflite` (~7.8 MB).
-4. Corre una inferencia de verificación (entrada aleatoria) para confirmar que
-   el modelo convertido funciona.
+4. Corre una inferencia de verificación (entrada aleatoria) para confirmar que el
+   modelo convertido funciona.
+
+La evaluación con fotografías reales se ejecuta aparte:
+
+```powershell
+model_prep\.venv\Scripts\python.exe model_prep\evaluate_lfw.py
+```
+
+Ese script usa el benchmark LFW y flip TTA. El resultado histórico registrado en
+`PLAN.md` debe reproducirse en un entorno limpio antes de presentarlo como una
+validación vigente del modelo.
 
 ## Detalles del modelo
 
@@ -39,12 +49,14 @@ Esto hace, en orden:
 - Por qué `float16` y no `int8`: las capas `PReLU` del modelo dan problemas
   conocidos al cuantizar a entero completo (ver
   [issue #47](https://github.com/HamadYA/GhostFaceNets/issues/47)). `float16`
-  reduce el tamaño a la mitad sin ese riesgo y corre rápido en CPU vía XNNPACK.
+  reduce el tamaño sin ese riesgo; el tiempo de ejecución final depende del
+  dispositivo y del runtime de TensorFlow Lite.
 
-## Siguiente paso
+## Sincronizar con Android
 
-Copiar `model_prep/output/ghostfacenet.tflite` a
-`app/src/main/assets/ghostfacenet.tflite` una vez creado el proyecto Android.
+Después de regenerar el modelo, copiar `model_prep/output/ghostfacenet.tflite` a
+`app/src/main/assets/ghostfacenet.tflite`. La aplicación Android carga este archivo
+desde sus assets al crear `EmbeddingExtractor`.
 
 ## Nota sobre `TF_USE_LEGACY_KERAS`
 

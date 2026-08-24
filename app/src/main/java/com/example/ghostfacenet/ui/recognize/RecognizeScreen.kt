@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -29,15 +31,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.ghostfacenet.GhostFaceNetApp
 import com.example.ghostfacenet.data.RecognitionOutcome
+import com.example.ghostfacenet.ml.MatchResult
 import com.example.ghostfacenet.ui.ViewModelFactory
 import com.example.ghostfacenet.ui.loadBitmapFromUri
+import java.io.File
 
 @Composable
 fun RecognizeScreen(app: GhostFaceNetApp, threshold: Float) {
@@ -93,12 +100,7 @@ fun RecognizeScreen(app: GhostFaceNetApp, threshold: Float) {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("GhostFaceNet", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Reconocimiento facial 100% local",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
+        Text("Reconocimiento Facial", style = MaterialTheme.typography.headlineSmall)
 
         previewBitmap?.let { bitmap ->
             Image(
@@ -151,18 +153,81 @@ private fun ResultCard(outcome: RecognitionOutcome) {
         Column(modifier = Modifier.padding(16.dp)) {
             when (outcome) {
                 is RecognitionOutcome.Match -> {
-                    Text(
-                        "✔ ${outcome.result.personName}",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text("Similitud: ${"%.3f".format(outcome.result.similarity)}")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        AsyncImage(
+                            model = File(outcome.result.referenceImagePath),
+                            contentDescription = outcome.result.personName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface)
+                        )
+                        Column {
+                            Text(
+                                "✔ ${outcome.result.personName}",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text("Similitud: ${"%.3f".format(outcome.result.similarity)}")
+                        }
+                    }
+                    if (outcome.alternatives.isNotEmpty()) {
+                        CloseCandidatesList(
+                            title = "También cerca:",
+                            candidates = outcome.alternatives,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+                    }
                 }
-                is RecognitionOutcome.NoMatch ->
+                is RecognitionOutcome.NoMatch -> {
                     Text("Persona no reconocida (no supera el umbral configurado).")
+                    if (outcome.closest.isNotEmpty()) {
+                        CloseCandidatesList(
+                            title = "Lo más parecido que encontró:",
+                            candidates = outcome.closest,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+                    }
+                }
                 is RecognitionOutcome.NoFaceDetected ->
                     Text("No se detectó ningún rostro en la imagen.")
                 is RecognitionOutcome.EmptyDatabase ->
                     Text("Todavía no hay personas importadas. Ve a la pestaña Importar.")
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloseCandidatesList(
+    title: String,
+    candidates: List<MatchResult>,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(title, style = MaterialTheme.typography.labelMedium)
+        candidates.forEach { candidate ->
+            Row(
+                modifier = Modifier.padding(top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                AsyncImage(
+                    model = File(candidate.referenceImagePath),
+                    contentDescription = candidate.personName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                )
+                Text(
+                    "${candidate.personName}: ${"%.3f".format(candidate.similarity)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
