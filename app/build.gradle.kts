@@ -80,11 +80,9 @@ dependencies {
     // TensorFlow Lite (motor de inferencia on-device para ghostfacenet.tflite)
     implementation("org.tensorflow:tensorflow-lite:2.16.1")
 
-    // DocumentFile - navegar carpetas elegidas via Storage Access Framework
-    implementation("androidx.documentfile:documentfile:1.0.1")
-
     // Coil - carga de imagenes en Compose
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

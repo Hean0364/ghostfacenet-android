@@ -9,7 +9,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** Envoltorio sobre ML Kit Face Detection (100% on-device, no requiere red). */
+
 class FaceDetector {
 
     private val options = FaceDetectorOptions.Builder()

@@ -3,30 +3,17 @@ package com.example.ghostfacenet.ui.people
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ghostfacenet.data.FaceRepository
-import com.example.ghostfacenet.data.db.PersonEntity
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.ghostfacenet.data.db.PerfilEntity
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.stateIn
 
 class PeopleViewModel(private val repository: FaceRepository) : ViewModel() {
 
-    private val _people = MutableStateFlow<List<PersonEntity>>(emptyList())
-    val people: StateFlow<List<PersonEntity>> = _people
-
-    init {
-        refresh()
-    }
-
-    fun refresh() {
-        viewModelScope.launch {
-            _people.value = repository.getAllPeople()
-        }
-    }
-
-    fun deleteAll() {
-        viewModelScope.launch {
-            repository.deleteAllPeople()
-            refresh()
-        }
-    }
+    val people: StateFlow<List<PerfilEntity>> = repository.observePeople()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
 }

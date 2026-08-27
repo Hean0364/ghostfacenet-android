@@ -1,5 +1,6 @@
 package com.example.ghostfacenet.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -15,34 +16,54 @@ import androidx.room.PrimaryKey
     tableName = "face_embeddings",
     foreignKeys = [
         ForeignKey(
-            entity = PersonEntity::class,
+            entity = PerfilEntity::class,
             parentColumns = ["id"],
-            childColumns = ["personId"],
+            childColumns = ["perfil_id"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("personId")]
+    indices = [
+        Index("perfil_id"),
+        Index("foto_id")
+    ]
 )
 data class FaceEmbeddingEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val personId: Long,
+    @ColumnInfo(name = "perfil_id") val perfilId: Long,
     val embedding: ByteArray,
-    val sourceImagePath: String
+    @ColumnInfo(name = "source_image_path") val sourceImagePath: String,
+    /**
+     * Valor de perfiles.updateAt usado al generar este embedding.
+     * Permite invalidarlo cuando el registro externo cambia su foto.
+     */
+    @ColumnInfo(name = "perfil_update_at") val perfilUpdateAt: Long,
+    /**
+     * ID de la foto adicional que produjo este embedding. Es null para la
+     * foto principal almacenada en perfiles.foto_perfil.
+     */
+    @ColumnInfo(name = "foto_id") val fotoId: Long? = null,
+    @ColumnInfo(name = "foto_update_at") val fotoUpdateAt: Long? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is FaceEmbeddingEntity) return false
         return id == other.id &&
-            personId == other.personId &&
+            perfilId == other.perfilId &&
             embedding.contentEquals(other.embedding) &&
-            sourceImagePath == other.sourceImagePath
+            sourceImagePath == other.sourceImagePath &&
+            perfilUpdateAt == other.perfilUpdateAt &&
+            fotoId == other.fotoId &&
+            fotoUpdateAt == other.fotoUpdateAt
     }
 
     override fun hashCode(): Int {
         var result = id.hashCode()
-        result = 31 * result + personId.hashCode()
+        result = 31 * result + perfilId.hashCode()
         result = 31 * result + embedding.contentHashCode()
         result = 31 * result + sourceImagePath.hashCode()
+        result = 31 * result + perfilUpdateAt.hashCode()
+        result = 31 * result + (fotoId?.hashCode() ?: 0)
+        result = 31 * result + (fotoUpdateAt?.hashCode() ?: 0)
         return result
     }
 }

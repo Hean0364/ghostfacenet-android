@@ -20,9 +20,11 @@ fun SettingsScreen(app: GhostFaceNetApp, onThresholdChange: (Float) -> Unit) {
     val viewModel: SettingsViewModel = viewModel(factory = ViewModelFactory(app))
     val threshold by viewModel.threshold.collectAsState()
 
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(24.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+    ) {
         Text("Ajustes", style = MaterialTheme.typography.headlineSmall)
         Text(
             "Umbral de reconocimiento: ${"%.2f".format(threshold)}",
@@ -37,8 +39,8 @@ fun SettingsScreen(app: GhostFaceNetApp, onThresholdChange: (Float) -> Unit) {
             valueRange = 0f..1f
         )
         Text(
-            "Un umbral más alto reduce falsos positivos, pero puede rechazar coincidencias válidas. " +
-                "Valor por defecto calibrado contra el benchmark LFW: 0.30."
+            "Un umbral más alto reduce falsos positivos, pero puede rechazar " +
+                "coincidencias válidas."
         )
     }
 }

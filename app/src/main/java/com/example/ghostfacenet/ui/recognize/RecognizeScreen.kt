@@ -3,15 +3,18 @@ package com.example.ghostfacenet.ui.recognize
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,38 +37,78 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.example.ghostfacenet.GhostFaceNetApp
 import com.example.ghostfacenet.data.RecognitionOutcome
 import com.example.ghostfacenet.ml.MatchResult
 import com.example.ghostfacenet.ui.ViewModelFactory
 import com.example.ghostfacenet.ui.loadBitmapFromUri
+import com.example.ghostfacenet.ui.people.ProfileImage
 import java.io.File
 
 @Composable
-fun RecognizeScreen(app: GhostFaceNetApp, threshold: Float) {
+fun RecognizeScreen(
+    app: GhostFaceNetApp,
+    threshold: Float,
+    onPersonClick: (Long) -> Unit
+) {
     val context = LocalContext.current
     val viewModel: RecognizeViewModel = viewModel(factory = ViewModelFactory(app))
     val state by viewModel.state.collectAsState()
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var expandedCandidate by remember { mutableStateOf<MatchResult?>(null) }
+    var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraPhotoFile by remember { mutableStateOf<File?>(null) }
 
     val takePictureLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) {
-            previewBitmap = bitmap
-            viewModel.recognize(bitmap, threshold)
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uri = cameraPhotoUri
+        val file = cameraPhotoFile
+        cameraPhotoUri = null
+        cameraPhotoFile = null
+
+        try {
+            if (success && uri != null) {
+                val bitmap = loadBitmapFromUri(context, uri)
+                if (bitmap != null) {
+                    previewBitmap = bitmap
+                    viewModel.recognize(bitmap, threshold)
+                }
+            }
+        } finally {
+            file?.delete()
         }
+    }
+
+    fun launchCamera() {
+        val file = File.createTempFile("recognition_", ".jpg", context.cacheDir)
+        val uri = runCatching {
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+        }.getOrNull()
+
+        if (uri == null) {
+            file.delete()
+            return
+        }
+
+        cameraPhotoFile = file
+        cameraPhotoUri = uri
+        takePictureLauncher.launch(uri)
     }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) takePictureLauncher.launch(null) }
+    ) { granted -> if (granted) launchCamera() }
 
     val pickImageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -96,7 +140,8 @@ fun RecognizeScreen(app: GhostFaceNetApp, threshold: Float) {
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -120,7 +165,7 @@ fun RecognizeScreen(app: GhostFaceNetApp, threshold: Float) {
                 val granted = ContextCompat.checkSelfPermission(
                     context, Manifest.permission.CAMERA
                 ) == PackageManager.PERMISSION_GRANTED
-                if (granted) takePictureLauncher.launch(null)
+                if (granted) launchCamera()
                 else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }) {
                 Text("Tomar foto")
@@ -141,91 +186,134 @@ fun RecognizeScreen(app: GhostFaceNetApp, threshold: Float) {
             when (val s = state) {
                 is RecognizeUiState.Idle -> Text("Toma una foto o elige una de tu galería para reconocer a alguien.")
                 is RecognizeUiState.Loading -> CircularProgressIndicator()
-                is RecognizeUiState.Result -> ResultCard(s.outcome)
+                is RecognizeUiState.Result -> ResultCard(
+                    outcome = s.outcome,
+                    onPersonClick = onPersonClick,
+                    onImageClick = { expandedCandidate = it }
+                )
             }
         }
+    }
+
+    expandedCandidate?.let { candidate ->
+        ExpandedCandidateImage(
+            candidate = candidate,
+            onDismiss = { expandedCandidate = null }
+        )
     }
 }
 
 @Composable
-private fun ResultCard(outcome: RecognitionOutcome) {
+private fun ResultCard(
+    outcome: RecognitionOutcome,
+    onPersonClick: (Long) -> Unit,
+    onImageClick: (MatchResult) -> Unit
+) {
     Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             when (outcome) {
                 is RecognitionOutcome.Match -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        AsyncImage(
-                            model = File(outcome.result.referenceImagePath),
-                            contentDescription = outcome.result.personName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface)
-                        )
-                        Column {
-                            Text(
-                                "✔ ${outcome.result.personName}",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text("Similitud: ${"%.3f".format(outcome.result.similarity)}")
-                        }
-                    }
-                    if (outcome.alternatives.isNotEmpty()) {
-                        CloseCandidatesList(
-                            title = "También cerca:",
-                            candidates = outcome.alternatives,
-                            modifier = Modifier.padding(top = 12.dp)
-                        )
-                    }
+                    PossibleMatchesList(
+                        candidates = listOf(outcome.result) + outcome.alternatives,
+                        onPersonClick = onPersonClick,
+                        onImageClick = onImageClick
+                    )
                 }
                 is RecognitionOutcome.NoMatch -> {
-                    Text("Persona no reconocida (no supera el umbral configurado).")
-                    if (outcome.closest.isNotEmpty()) {
-                        CloseCandidatesList(
-                            title = "Lo más parecido que encontró:",
-                            candidates = outcome.closest,
-                            modifier = Modifier.padding(top = 12.dp)
-                        )
-                    }
+                    PossibleMatchesList(
+                        candidates = outcome.closest,
+                        onPersonClick = onPersonClick,
+                        onImageClick = onImageClick
+                    )
                 }
                 is RecognitionOutcome.NoFaceDetected ->
                     Text("No se detectó ningún rostro en la imagen.")
                 is RecognitionOutcome.EmptyDatabase ->
-                    Text("Todavía no hay personas importadas. Ve a la pestaña Importar.")
+                    Text("No hay embeddings disponibles en la base local.")
             }
         }
     }
 }
 
 @Composable
-private fun CloseCandidatesList(
-    title: String,
+private fun PossibleMatchesList(
     candidates: List<MatchResult>,
-    modifier: Modifier = Modifier
+    onPersonClick: (Long) -> Unit,
+    onImageClick: (MatchResult) -> Unit
 ) {
-    Column(modifier = modifier) {
-        Text(title, style = MaterialTheme.typography.labelMedium)
-        candidates.forEach { candidate ->
-            Row(
-                modifier = Modifier.padding(top = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+    Text("Posibles coincidencias", style = MaterialTheme.typography.titleMedium)
+    if (candidates.isEmpty()) {
+        Text(
+            "No se encontraron posibles coincidencias.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        return
+    }
+
+    candidates.forEach { candidate ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            ProfileImage(
+                reference = candidate.referenceImageBase64,
+                contentDescription = candidate.personName,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .clickable { onImageClick(candidate) }
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onPersonClick(candidate.personId) }
             ) {
-                AsyncImage(
-                    model = File(candidate.referenceImagePath),
-                    contentDescription = candidate.personName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
+                Text(candidate.personName, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Similitud: ${"%.3f".format(candidate.similarity)}",
+                    style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    "${candidate.personName}: ${"%.3f".format(candidate.similarity)}",
+                    "Toca para consultar el perfil",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpandedCandidateImage(
+    candidate: MatchResult,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                ProfileImage(
+                    reference = candidate.referenceImageBase64,
+                    contentDescription = candidate.personName,
+                    modifier = Modifier
+                        .size(300.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+                Text(
+                    candidate.personName,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                Text(
+                    "Toca fuera de la imagen para cerrar.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

@@ -5,7 +5,7 @@ import com.example.ghostfacenet.data.db.EmbeddingWithPerson
 data class MatchResult(
     val personId: Long,
     val personName: String,
-    val referenceImagePath: String,
+    val referenceImageBase64: String,
     val similarity: Float
 )
 
@@ -25,19 +25,19 @@ object FaceMatcher {
     fun findTopMatches(
         queryEmbedding: FloatArray,
         candidates: List<EmbeddingWithPerson>,
-        topN: Int = 3
+        topN: Int = 5
     ): List<MatchResult> {
         val bestPerPerson = HashMap<Long, MatchResult>()
 
         for (candidate in candidates) {
             val candidateEmbedding = EmbeddingCodec.decode(candidate.embedding)
             val similarity = cosineSimilarity(queryEmbedding, candidateEmbedding)
-            val current = bestPerPerson[candidate.personId]
+            val current = bestPerPerson[candidate.perfilId]
             if (current == null || similarity > current.similarity) {
-                bestPerPerson[candidate.personId] = MatchResult(
-                    personId = candidate.personId,
+                bestPerPerson[candidate.perfilId] = MatchResult(
+                    personId = candidate.perfilId,
                     personName = candidate.personName,
-                    referenceImagePath = candidate.referenceImagePath,
+                    referenceImageBase64 = candidate.referenceImageBase64,
                     similarity = similarity
                 )
             }

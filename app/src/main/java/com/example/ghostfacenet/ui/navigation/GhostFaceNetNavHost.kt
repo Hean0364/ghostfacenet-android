@@ -20,7 +20,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.ghostfacenet.GhostFaceNetApp
 import com.example.ghostfacenet.data.ThresholdPreferences
-import com.example.ghostfacenet.ui.importer.ImportScreen
 import com.example.ghostfacenet.ui.people.PeopleListScreen
 import com.example.ghostfacenet.ui.people.PersonDetailScreen
 import com.example.ghostfacenet.ui.recognize.RecognizeScreen
@@ -54,13 +53,20 @@ fun GhostFaceNetNavHost(app: GhostFaceNetApp) {
             startDestination = Screen.Recognize.route,
             modifier = Modifier.padding(padding)
         ) {
-            composable(Screen.Recognize.route) { RecognizeScreen(app, threshold) }
+            composable(Screen.Recognize.route) {
+                RecognizeScreen(
+                    app = app,
+                    threshold = threshold,
+                    onPersonClick = { personId ->
+                        navController.navigate(Screen.PersonDetail.route(personId))
+                    }
+                )
+            }
             composable(Screen.People.route) {
                 PeopleListScreen(app, onPersonClick = { personId ->
                     navController.navigate(Screen.PersonDetail.route(personId))
                 })
             }
-            composable(Screen.Import.route) { ImportScreen(app) }
             composable(Screen.Settings.route) {
                 SettingsScreen(app) { newValue -> threshold = newValue }
             }
