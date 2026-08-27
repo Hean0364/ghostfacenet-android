@@ -48,20 +48,21 @@ El procesamiento de reconocimiento se realiza en el dispositivo:
 - Android SDK `34`.
 - Dispositivo o emulador con API `26` o superior.
 - Permiso de cámara para utilizar la captura directa.
-- Modelo `ghostfacenet.tflite` ubicado en:
+- El modelo `ghostfacenet.tflite`, ya incluido en el repositorio, ubicado en:
 
 ```text
 app/src/main/assets/ghostfacenet.tflite
 ```
 
-El modelo no está incluido en el código fuente por defecto. Debe generarse o conseguirse siguiendo la sección [Preparar el modelo](#preparar-el-modelo).
+El modelo se empaqueta automáticamente dentro del APK al compilar la aplicación.
+No es necesario descargarlo ni generarlo para ejecutar la demo.
 
-### Conversión del modelo
+### Conversión del modelo (opcional)
 
-Para generar el modelo se necesita:
+Solo se necesitan estas herramientas si se desea regenerar o actualizar el modelo:
 
 - Python 3.
-- Conexión a Internet durante la descarga del checkpoint y, opcionalmente, del benchmark LFW.
+- Conexión a Internet durante la descarga del checkpoint.
 - Dependencias definidas en `model_prep/requirements.txt`.
 
 
@@ -70,40 +71,10 @@ Para generar el modelo se necesita:
 
 
 
-### 1. Preparar el entorno Python
+### 1. Abrir y compilar
 
+El modelo ya se encuentra en `app/src/main/assets/ghostfacenet.tflite`.
 Desde la raíz del proyecto, en PowerShell:
-
-```powershell
-python -m venv model_prep\.venv
-model_prep\.venv\Scripts\python.exe -m pip install -r model_prep\requirements.txt
-```
-
-
-
-### 2. Generar el modelo TFLite
-
-```powershell
-model_prep\.venv\Scripts\python.exe model_prep\convert_to_tflite.py
-```
-
-El script:
-
-1. Descarga el checkpoint si todavía no existe.
-2. Carga la arquitectura y los pesos de GhostFaceNet.
-3. Convierte el modelo a TensorFlow Lite con cuantización `float16`.
-4. Ejecuta una inferencia de comprobación.
-
-Después, copia el resultado a los assets de Android:
-
-```powershell
-New-Item -ItemType Directory -Force app\src\main\assets | Out-Null
-Copy-Item model_prep\output\ghostfacenet.tflite app\src\main\assets\ghostfacenet.tflite -Force
-```
-
-
-
-### 3. Compilar e instalar
 
 ```powershell
 .\gradlew.bat assembleDebug
@@ -112,15 +83,35 @@ Copy-Item model_prep\output\ghostfacenet.tflite app\src\main\assets\ghostfacenet
 
 El APK de depuración se genera en:
 
-```text
+```powershell
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-También se puede abrir el proyecto desde Android Studio y ejecutar la configuración `app`.
+También se puede abrir el proyecto desde Android Studio y ejecutar la configuración
+`app`. No se requiere Python ni conexión a Internet para compilar y ejecutar la
+aplicación con el modelo incluido.
+
+### 2. Regenerar el modelo (opcional)
+
+Si se necesita convertir nuevamente el checkpoint:
+
+```powershell
+python -m venv model_prep\.venv
+model_prep\.venv\Scripts\python.exe -m pip install -r model_prep\requirements.txt
+model_prep\.venv\Scripts\python.exe model_prep\convert_to_tflite.py
+Copy-Item model_prep\output\ghostfacenet.tflite app\src\main\assets\ghostfacenet.tflite -Force
+```
+
+El script descarga el checkpoint si hace falta, lo convierte a TensorFlow Lite
+con cuantización `float16` y ejecuta una inferencia de comprobación. Después,
+el archivo generado reemplaza el asset incluido.
 
 ## Preparar el modelo
 
 El modelo utilizado es `GhostFaceNetV1-1.3-2 (ArcFace, MS1MV3)` del proyecto [GhostFaceNets](https://github.com/HamadYA/GhostFaceNets).
+El archivo TFLite correspondiente ya está incluido en el repositorio. Esta
+sección describe sus características y el procedimiento opcional para
+regenerarlo.
 
 ### Especificaciones
 
@@ -226,7 +217,29 @@ Los embeddings se regeneran cuando faltan o cuando las marcas de tiempo indican 
 
 ### Carga de perfiles
 
-La aplicación crea y actualiza internamente los embeddings, pero no expone operaciones de alta, edición o importación de perfiles en la UI actual. Por ello, la base local debe prepararse mediante el mecanismo de distribución de datos que utilice cada instalación, respetando el esquema definido en las entidades Room.
+Los perfiles deben cargarse manualmente en la base local antes de utilizar el
+reconocimiento. La interfaz actual no tiene operaciones de alta, edición o
+importación de perfiles.
+
+Para cada persona, inserta un registro en `perfiles` y coloca la fotografía
+principal convertida a Base64 en `perfiles.foto_perfil`. Como mínimo, el registro
+debe incluir:
+
+- `nombre`.
+- `estado`, normalmente `Activo`.
+- `foto_perfil` con una imagen JPEG o PNG codificada en Base64.
+- `createdAt` y `updateAt` como marcas de tiempo en milisegundos.
+
+Las fotos adicionales deben insertarse manualmente en `perfil_fotos`, usando el
+`perfil_id` correspondiente y la imagen Base64 en `foto_base64`. No es necesario
+insertar manualmente la tabla `face_embeddings`: al iniciar la aplicación,
+`FaceRepository` detecta los perfiles y genera los embeddings a partir de las
+imágenes almacenadas.
+
+La carga puede realizarse mediante el mecanismo de distribución de SQLite que
+utilice cada instalación, por ejemplo una base precargada o un proceso externo
+de importación. Debe respetarse el esquema de Room y actualizar `updateAt` cada
+vez que se sustituya una fotografía, para que el embedding se regenere.
 
 Las imágenes deben ser decodificables como JPEG/PNG después de eliminar, si existe, el prefijo `data:image/...;base64,`.
 
@@ -239,28 +252,6 @@ model_prep\.venv\Scripts\python.exe model_prep\evaluate_lfw.py
 ```
 
 La evaluación descarga `lfw.bin` la primera vez, genera embeddings con flip TTA y busca el mejor umbral en el conjunto de pares. Las métricas publicadas del checkpoint original no sustituyen una validación del modelo convertido en el entorno y los dispositivos donde se vaya a utilizar.
-
-## Datos de prueba
-
-`test_data/prepare_test_set.py` organiza un dataset LFW ya extraído en tres grupos:
-
-- `enroll/`: fotografías que se usarían para preparar perfiles.
-- `probe_known/`: fotografías de personas que sí aparecen en el conjunto de enrolamiento.
-- `probe_unknown/`: fotografías de personas que no aparecen en el conjunto de enrolamiento.
-
-Ejecutar:
-
-```powershell
-python test_data\prepare_test_set.py
-```
-
-El script espera encontrar el dataset fuente en:
-
-```text
-test_data/lfw/
-```
-
-Los conjuntos generados están excluidos del control de versiones porque pueden ocupar mucho espacio.
 
 ## Estructura del proyecto
 
@@ -279,8 +270,6 @@ Los conjuntos generados están excluidos del control de versiones porque pueden 
 │   ├── convert_to_tflite.py   # Descarga y conversión del checkpoint
 │   ├── evaluate_lfw.py        # Evaluación contra LFW
 │   └── requirements.txt       # Dependencias Python
-├── test_data/
-│   └── prepare_test_set.py    # Organización de datos de prueba
 ├── build.gradle.kts
 ├── settings.gradle.kts
 └── gradlew.bat

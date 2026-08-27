@@ -32,3 +32,6 @@ Thumbs.db
 # Datos de prueba y fotografías de rostros
 test_data_lfw_backup_2026-08-22/
 docs/
+
+test_data/
+prepare_test_set.py

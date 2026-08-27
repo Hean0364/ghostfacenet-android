@@ -1,8 +1,11 @@
 # model_prep — Conversión de GhostFaceNet a TFLite
 
-Convierte el checkpoint preentrenado `GhostFaceNetV1-1.3-2 (ArcFace, MS1MV3)` de
+Procedimiento opcional para convertir el checkpoint preentrenado
+`GhostFaceNetV1-1.3-2 (ArcFace, MS1MV3)` de
 [HamadYA/GhostFaceNets](https://github.com/HamadYA/GhostFaceNets) a un archivo
 `.tflite` listo para usar en la app Android con TensorFlow Lite `Interpreter`.
+El modelo TFLite ya está incluido en `app/src/main/assets`, por lo que estos
+pasos solo son necesarios para regenerarlo.
 
 ## Setup (Windows, PowerShell)
 
